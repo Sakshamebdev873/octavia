@@ -53,6 +53,7 @@ export const updateFlowSchema = z
 export type CreateFlowInput = z.output<typeof createFlowSchema>;
 export type CreateFlowRequest = z.input<typeof createFlowSchema>;
 export type UpdateFlowInput = z.output<typeof updateFlowSchema>;
+export type UpdateFlowRequest = z.input<typeof updateFlowSchema>;
 
 /** GET /api/flows/:id */
 export interface Flow {
