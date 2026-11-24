@@ -6,6 +6,7 @@ export const ERROR_CODES = [
   "INVALID_SIGNATURE",
   "NOT_FOUND",
   "FLOW_DISABLED",
+  "DUPLICATE_EVENT",
   "PAYLOAD_TOO_LARGE",
   "INTERNAL_ERROR",
 ] as const;

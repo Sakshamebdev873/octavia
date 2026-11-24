@@ -78,4 +78,13 @@ export interface FlowStats {
 export interface TriggerResponse {
   runId: string;
   status: FinalRunStatus;
+  /** Present when an X-Event-Id was seen before: the run is the original one, nothing ran again. */
+  duplicate?: true;
 }
+
+/** X-Event-Id: optional sender id of an event, used to ignore duplicate deliveries. */
+export const eventIdSchema = z
+  .string()
+  .trim()
+  .min(1, "X-Event-Id must not be empty")
+  .max(200, "X-Event-Id must be at most 200 characters");

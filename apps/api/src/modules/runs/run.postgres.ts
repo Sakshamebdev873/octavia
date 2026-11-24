@@ -3,7 +3,7 @@ import type { SQL } from "bun";
 import { fromJsonText, toJsonText } from "../../db/postgres";
 import type { RunResult } from "../engine/runner";
 import { encodeCursor } from "./cursor";
-import { isUuid, type ListRunsQuery, type RunRepository, type StartRunInput } from "./run.repository";
+import { isUuid, type ClaimResult, type ListRunsQuery, type RunRepository, type StartRunInput } from "./run.repository";
 
 /** Columns of `runs` as Bun.SQL returns them (timestamptz → Date). */
 interface RunRow {
@@ -25,7 +25,6 @@ interface StepRow {
   error: string | null;
   duration_ms: number;
 }
-
 
 function toRunSummary(row: RunRow): RunSummary {
   return {
@@ -60,6 +59,23 @@ export class PostgresRunRepository implements RunRepository {
       INSERT INTO runs (id, flow_id, status, payload, started_at)
       VALUES (${id}::uuid, ${flowId}, 'running', ${toJsonText(payload)}::text::json, ${startedAt})`;
     return id;
+  }
+
+  async claim({ flowId, payload, startedAt, eventId }: StartRunInput & { eventId: string }): Promise<ClaimResult> {
+    const id = Bun.randomUUIDv7();
+    // If another delivery of this event committed first, the unique index makes this
+    // insert a no-op (it waits for an in-flight insert to commit, so there is no race).
+    const inserted = await this.sql<{ id: string }[]>`
+      INSERT INTO runs (id, flow_id, event_id, status, payload, started_at)
+      VALUES (${id}::uuid, ${flowId}, ${eventId}, 'running', ${toJsonText(payload)}::text::json, ${startedAt})
+      ON CONFLICT (flow_id, event_id) WHERE event_id IS NOT NULL DO NOTHING
+      RETURNING id`;
+    if (inserted.length > 0) return { claimed: true, runId: id };
+
+    const [existing] = await this.sql<{ id: string; status: RunStatus }[]>`
+      SELECT id, status FROM runs WHERE flow_id = ${flowId} AND event_id = ${eventId}`;
+    if (!existing) throw new Error(`Event ${eventId} conflicted but no run was found`);
+    return { claimed: false, existing };
   }
 
   async finish(runId: string, result: RunResult, finishedAt: Date, durationMs: number): Promise<void> {

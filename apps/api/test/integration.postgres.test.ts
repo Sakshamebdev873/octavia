@@ -115,6 +115,21 @@ describe.skipIf(!reachable)("PostgresRunRepository", () => {
     expect(latest.get(flowB)).toMatchObject({ id, status: "running" });
   });
 
+  test("claims an event id once, even with concurrent deliveries", async () => {
+    const eventId = `evt-${Bun.randomUUIDv7()}`;
+    const claims = await Promise.all(
+      Array.from({ length: 5 }, () => repo.claim({ flowId: flowB, payload: {}, startedAt: new Date(), eventId })),
+    );
+    const winners = claims.filter((claim) => claim.claimed);
+    expect(winners).toHaveLength(1);
+    const winner = winners[0];
+    for (const claim of claims) {
+      if (!claim.claimed && winner?.claimed) expect(claim.existing.id).toBe(winner.runId);
+    }
+    // The same event id on another flow is a different event.
+    expect((await repo.claim({ flowId: flowA, payload: {}, startedAt: new Date(), eventId })).claimed).toBe(true);
+  });
+
   test("deleting a flow's runs cascades to their steps", async () => {
     await repo.deleteByFlow(flowA);
     expect((await repo.listByFlow(flowA, { limit: 10 })).items).toHaveLength(0);

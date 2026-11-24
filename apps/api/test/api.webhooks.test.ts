@@ -116,6 +116,40 @@ describe("POST /api/hooks/:flowId", () => {
     expect(res.status).toBe(401);
   });
 
+  test("X-Event-Id: a repeated event returns the original run and runs nothing again", async () => {
+    const { app, flow, runs, hook } = await setup();
+    const raw = JSON.stringify(orderEvent());
+    const first = (await (await app.request(hook, signedRequest(raw, flow.webhookSecret, { "X-Event-Id": "evt-1" }))).json()) as TriggerResponse;
+    const res = await app.request(hook, signedRequest(raw, flow.webhookSecret, { "X-Event-Id": "evt-1" }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Flowlet-Duplicate")).toBe("true");
+    expect(await res.json()).toEqual({ runId: first.runId, status: "success", duplicate: true });
+    expect(runs.runs.size).toBe(1);
+
+    await app.request(hook, signedRequest(raw, flow.webhookSecret, { "X-Event-Id": "evt-2" }));
+    await app.request(hook, signedRequest(raw, flow.webhookSecret));
+    expect(runs.runs.size).toBe(3);
+  });
+
+  test("X-Event-Id: a repeat while the first delivery is still running is a 409", async () => {
+    const { app, flow, runs, hook } = await setup();
+    await runs.claim({ flowId: flow.id, payload: {}, startedAt: new Date(), eventId: "evt-busy" });
+    const res = await app.request(
+      hook,
+      signedRequest(JSON.stringify(orderEvent()), flow.webhookSecret, { "X-Event-Id": "evt-busy" }),
+    );
+    expect(res.status).toBe(409);
+    expect(await errorCode(res)).toBe("DUPLICATE_EVENT");
+  });
+
+  test("X-Event-Id: an empty or too long id is a 400", async () => {
+    const { app, flow, hook } = await setup();
+    for (const id of [" ", "x".repeat(201)]) {
+      const res = await app.request(hook, signedRequest("{}", flow.webhookSecret, { "X-Event-Id": id }));
+      expect(res.status).toBe(400);
+    }
+  });
+
   test("runs show up in the history and stats", async () => {
     const { app, flow, hook } = await setup();
     await app.request(hook, signedRequest(JSON.stringify(orderEvent(4999)), flow.webhookSecret));

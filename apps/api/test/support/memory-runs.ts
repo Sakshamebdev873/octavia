@@ -1,7 +1,7 @@
 import type { FlowStats, LastRun, Run, RunPage } from "@flowlet/shared";
 import type { RunResult } from "../../src/modules/engine/runner";
 import { encodeCursor } from "../../src/modules/runs/cursor";
-import type { ListRunsQuery, RunRepository, StartRunInput } from "../../src/modules/runs/run.repository";
+import type { ClaimResult, ListRunsQuery, RunRepository, StartRunInput } from "../../src/modules/runs/run.repository";
 
 /** In-memory RunRepository for API tests. Same contract as PostgresRunRepository. */
 export class InMemoryRunRepository implements RunRepository {
@@ -21,6 +21,19 @@ export class InMemoryRunRepository implements RunRepository {
       steps: [],
     });
     return id;
+  }
+
+  /** (flowId, eventId) → runId, like the partial unique index. */
+  private readonly events = new Map<string, string>();
+
+  async claim(input: StartRunInput & { eventId: string }): Promise<ClaimResult> {
+    const key = JSON.stringify([input.flowId, input.eventId]);
+    const existingId = this.events.get(key);
+    const existing = existingId ? this.runs.get(existingId) : undefined;
+    if (existing) return { claimed: false, existing: { id: existing.id, status: existing.status } };
+    const runId = await this.start(input);
+    this.events.set(key, runId);
+    return { claimed: true, runId };
   }
 
   async finish(runId: string, result: RunResult, finishedAt: Date, durationMs: number): Promise<void> {
