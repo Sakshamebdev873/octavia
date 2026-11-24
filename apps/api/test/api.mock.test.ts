@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ApiErrorBody } from "@flowlet/shared";
-import { createApp } from "../src/app";
+import { buildTestApp } from "./support/test-app";
 
-const app = createApp({ webOrigin: "http://localhost:3000" });
+const { app } = buildTestApp();
 
 describe("POST /api/mock/receiver", () => {
   test("returns 200 and echoes the raw body", async () => {
