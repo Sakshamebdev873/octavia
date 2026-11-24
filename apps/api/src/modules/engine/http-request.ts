@@ -3,9 +3,12 @@ import type { HttpRequestStep, JsonValue } from "@flowlet/shared";
 export const HTTP_TIMEOUT_MS = 5000;
 export const MAX_RESPONSE_BODY_BYTES = 2048;
 
+/** The part of fetch the step uses. Narrower than `typeof fetch`, so tests can pass app.request. */
+export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
 export interface HttpRequestOptions {
   /** Injectable for tests. Defaults to the global fetch. */
-  fetch?: typeof fetch;
+  fetch?: FetchLike;
   timeoutMs?: number;
 }
 

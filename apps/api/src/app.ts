@@ -6,14 +6,18 @@ import { ApiError, errorBody } from "./lib/errors";
 import type { FlowRepository } from "./modules/flows/flow.repository";
 import { flowRoutes } from "./modules/flows/flow.routes";
 import { mockRoutes } from "./modules/mock/mock.routes";
+import type { RunnerOptions } from "./modules/engine/runner";
 import type { RunRepository } from "./modules/runs/run.repository";
 import { runRoutes } from "./modules/runs/run.routes";
+import { webhookRoutes } from "./modules/webhooks/webhook.routes";
 
 export const MAX_BODY_BYTES = 1024 * 1024; // 1 MB
 
 export interface AppDeps {
   flows: FlowRepository;
   runs: RunRepository;
+  /** Step runner options (for example an injected fetch in tests). */
+  engine?: RunnerOptions;
   /** Origin of the web app, allowed by CORS. */
   webOrigin: string;
   /** Log one line per request. Off in tests. */
@@ -47,6 +51,7 @@ export function createApp(deps: AppDeps): Hono {
   );
 
   app.route("/api/flows", flowRoutes(deps));
+  app.route("/api/hooks", webhookRoutes(deps));
   app.route("/api", runRoutes(deps));
   app.route("/api/mock", mockRoutes());
 
