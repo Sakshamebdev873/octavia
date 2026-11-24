@@ -1,6 +1,7 @@
 "use client";
 
 import { FILTER_OPERATORS, filterOperatorSchema, HTTP_METHODS, STEP_TYPES, stepTypeSchema, type FilterOperator } from "@flowlet/shared";
+import { useId } from "react";
 import { describedBy, Field, FieldError } from "@/components/field";
 import { newMappingRow, newStep, type FieldErrors, type StepDraft, type ValueType } from "@/lib/flow-draft";
 import { STEP_TYPE_LABELS } from "@/lib/format";
@@ -31,7 +32,10 @@ interface StepEditorProps {
 }
 
 export function StepEditor({ step, index, count, errors, onChange, onMove, onRemove }: StepEditorProps) {
-  const id = (field: string) => `step-${step.key}-${field}`;
+  // useId is the same on the server and in the browser. step.key comes from a module
+  // counter that differs between the two, so ids built from it broke hydration.
+  const uid = useId();
+  const id = (field: string) => `step${uid}${field}`;
   const error = (field: string) => errors[`steps.${index}.${field}`];
   const position = index + 1;
 
@@ -176,8 +180,8 @@ export function StepEditor({ step, index, count, errors, onChange, onMove, onRem
             <p className="label">Mapping</p>
             <p className="hint">Each output field takes its value from a dot path. A missing path gives null.</p>
             {step.rows.map((row, rowIndex) => {
-              const outputId = id(`row-${row.key}-output`);
-              const pathId = id(`row-${row.key}-path`);
+              const outputId = id(`row-${rowIndex}-output`);
+              const pathId = id(`row-${rowIndex}-path`);
               const outputError = error(`rows.${rowIndex}.output`);
               const pathError = error(`rows.${rowIndex}.path`);
               const updateRow = (patch: Partial<typeof row>) =>
