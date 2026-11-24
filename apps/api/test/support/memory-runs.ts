@@ -38,7 +38,7 @@ export class InMemoryRunRepository implements RunRepository {
 
   async finish(runId: string, result: RunResult, finishedAt: Date, durationMs: number): Promise<void> {
     const run = this.runs.get(runId);
-    if (!run) throw new Error(`Unknown run ${runId}`);
+    if (!run) return; // deleted with its flow while the steps ran, like the Postgres version
     this.runs.set(runId, {
       ...run,
       status: result.status,

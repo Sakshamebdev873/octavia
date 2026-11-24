@@ -34,7 +34,8 @@ export const filterStepSchema = z
     { path: ["value"], message: "gt and lt need a number" },
   );
 
-const outputKeySchema = z
+/** An output field name of a transform mapping. */
+export const outputKeySchema = z
   .string()
   .trim()
   .min(1, "Output field is required")

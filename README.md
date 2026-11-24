@@ -93,7 +93,7 @@ repositories as arguments, the API tests run the real routes on in-memory reposi
 `POST /api/flows` on the server *and* the form in the browser, so the message next to a field is
 the same one the API would return.
 
-**Tests (90):** filter operators, transform mapping, dot paths, http_request against a real local
+**Tests (97):** filter operators, transform mapping, dot paths, http_request against a real local
 server (500, timeout, redirect, 2 KB cap), the runner, HMAC signatures (checked against a digest
 computed with `openssl`), cursors, the schemas, and API tests for every endpoint and every webhook
 status code. Integration tests run the real SQL against PostgreSQL: pagination, stats, cascade,

@@ -36,6 +36,8 @@ export interface ApiErrorBody {
 export function toValidationIssues(error: z.ZodError): ValidationIssue[] {
   return error.issues.map((issue) => ({
     path: issue.path.map(String).join("."),
-    message: issue.message,
+    // A bad record key only says "Invalid key in record"; the real reason
+    // (for example "This name is reserved") is in the nested key issue.
+    message: issue.code === "invalid_key" ? (issue.issues[0]?.message ?? issue.message) : issue.message,
   }));
 }

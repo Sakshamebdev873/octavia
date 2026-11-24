@@ -81,6 +81,16 @@ export class PostgresRunRepository implements RunRepository {
   async finish(runId: string, result: RunResult, finishedAt: Date, durationMs: number): Promise<void> {
     // Readers never see a finished run with missing steps: all of it commits together.
     await this.sql.begin(async (tx) => {
+      const updated = await tx<{ id: string }[]>`
+        UPDATE runs
+        SET status = ${result.status}, error = ${result.error},
+            finished_at = ${finishedAt}, duration_ms = ${durationMs}
+        WHERE id = ${runId}::uuid
+        RETURNING id`;
+      // The flow was deleted while its steps ran, and its runs with it. Inserting
+      // the step rows would break the foreign key and turn the webhook into a 500.
+      if (updated.length === 0) return;
+
       for (const step of result.steps) {
         await tx`
           INSERT INTO run_steps (run_id, position, type, status, input, output, error, duration_ms)
@@ -88,11 +98,6 @@ export class PostgresRunRepository implements RunRepository {
                   ${toJsonText(step.input)}::text::json, ${toJsonText(step.output)}::text::json,
                   ${step.error}, ${step.durationMs})`;
       }
-      await tx`
-        UPDATE runs
-        SET status = ${result.status}, error = ${result.error},
-            finished_at = ${finishedAt}, duration_ms = ${durationMs}
-        WHERE id = ${runId}::uuid`;
     });
   }
 

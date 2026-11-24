@@ -51,7 +51,7 @@ export function FlowForm({ initial, submitLabel, cancelHref, onSubmit }: FlowFor
       await onSubmit(request);
     } catch (error) {
       if (error instanceof ApiClientError && error.issues.length > 0) {
-        setErrors(issuesToErrors(error.issues));
+        setErrors(issuesToErrors(error.issues, draft));
         setFormError("The server rejected some fields. Please fix them.");
       } else {
         setFormError(errorMessage(error));

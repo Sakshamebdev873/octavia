@@ -1,6 +1,7 @@
 import {
   createFlowSchema,
   dotPathSchema,
+  outputKeySchema,
   toValidationIssues,
   type CreateFlowRequest,
   type FilterOperator,
@@ -142,8 +143,28 @@ function toStepInput(step: StepDraft, index: number, errors: FieldErrors): Step 
   }
 }
 
-export function issuesToErrors(issues: ValidationIssue[], into: FieldErrors = {}): FieldErrors {
-  for (const issue of issues) into[issue.path] ??= issue.message;
+const MAPPING_ENTRY_PATH = /^steps\.(\d+)\.mapping\.(.+)$/;
+
+/**
+ * The schema reports a mapping entry as `steps.1.mapping.<output field>`, but the
+ * form has one input per row. Point the error at that row's input instead: its
+ * output field when the field name is invalid, otherwise its source path.
+ */
+function formPath(path: string, draft: FlowDraft | undefined): string {
+  const match = MAPPING_ENTRY_PATH.exec(path);
+  if (!draft || !match) return path;
+  const [, stepIndex = "", outputKey = ""] = match;
+  const step = draft.steps[Number(stepIndex)];
+  if (step?.type !== "transform") return path;
+  const row = step.rows.findIndex((r) => r.output.trim() === outputKey);
+  if (row === -1) return path;
+  const field = outputKeySchema.safeParse(outputKey).success ? "path" : "output";
+  return `steps.${stepIndex}.rows.${row}.${field}`;
+}
+
+/** Collects issues as one message per field path. The first message for a field wins. */
+export function issuesToErrors(issues: ValidationIssue[], draft?: FlowDraft, into: FieldErrors = {}): FieldErrors {
+  for (const issue of issues) into[formPath(issue.path, draft)] ??= issue.message;
   return into;
 }
 
@@ -157,6 +178,6 @@ export function validateDraft(draft: FlowDraft): { request: CreateFlowRequest | 
     steps: draft.steps.map((step, index) => toStepInput(step, index, errors)),
   };
   const result = createFlowSchema.safeParse(request);
-  if (!result.success) issuesToErrors(toValidationIssues(result.error), errors);
+  if (!result.success) issuesToErrors(toValidationIssues(result.error), draft, errors);
   return Object.keys(errors).length > 0 ? { request: null, errors } : { request, errors };
 }

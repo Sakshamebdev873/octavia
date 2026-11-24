@@ -110,3 +110,13 @@ describe("runListQuerySchema", () => {
     expect(runListQuerySchema.safeParse({ status: "done" }).success).toBe(false);
   });
 });
+
+describe("toValidationIssues", () => {
+  test("gives the real reason for a bad mapping key, not Zod's generic record message", () => {
+    const result = stepSchema.safeParse({ type: "transform", mapping: { constructor: "order.id" } });
+    if (result.success) throw new Error("expected validation to fail");
+    expect(toValidationIssues(result.error)).toEqual([
+      { path: "mapping.constructor", message: "This name is reserved" },
+    ]);
+  });
+});

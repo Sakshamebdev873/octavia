@@ -130,6 +130,14 @@ describe.skipIf(!reachable)("PostgresRunRepository", () => {
     expect((await repo.claim({ flowId: flowA, payload: {}, startedAt: new Date(), eventId })).claimed).toBe(true);
   });
 
+  test("finishing a run whose flow was deleted meanwhile is a no-op, not an error", async () => {
+    const id = await repo.start({ flowId: flowB, payload: {}, startedAt: new Date() });
+    await repo.deleteByFlow(flowB); // the flow is deleted while its steps are still running
+    const step = { position: 1, type: "transform", status: "success", input: {}, output: {}, error: null, durationMs: 0 } as const;
+    await repo.finish(id, success([step]), new Date(), 1);
+    expect(await repo.findById(id)).toBeNull();
+  });
+
   test("deleting a flow's runs cascades to their steps", async () => {
     await repo.deleteByFlow(flowA);
     expect((await repo.listByFlow(flowA, { limit: 10 })).items).toHaveLength(0);
