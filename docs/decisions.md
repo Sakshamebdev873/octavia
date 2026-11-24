@@ -35,11 +35,13 @@ done, all `run_steps` rows and the final run update are written in **one transac
 Without the extra, the same event delivered twice creates two runs, and an `http_request` step
 sends twice. Webhook senders retry on timeouts, so this happens in real life.
 
-With the extra (planned): if `X-Event-Id` is present, the run insert uses a partial unique index
+With the extra (built): if `X-Event-Id` is present, the run insert uses a partial unique index
 on `(flow_id, event_id)`. `INSERT ... ON CONFLICT DO NOTHING` either claims the event or finds the
-existing run. A duplicate returns `200` with the **original** `runId` and status, plus the header
-`X-Flowlet-Duplicate: true`, and nothing runs again. Claiming before running closes the race
-between two concurrent deliveries.
+existing run. A duplicate returns `200` with the **original** `runId` and status, plus
+`"duplicate": true` and the header `X-Flowlet-Duplicate: true`, and nothing runs again. Claiming
+before running closes the race between two concurrent deliveries (tested with 5 parallel claims
+against PostgreSQL). If the original is still running, the duplicate gets `409 DUPLICATE_EVENT`:
+the sender retries, and by then the original has finished.
 
 ## Flow deletion
 

@@ -29,7 +29,7 @@ Tasks
   - `dev`: runs `apps/api` and `apps/web` dev servers together (`bun run --filter`).
   - `migrate`: `bun run --filter @flowlet/api migrate`.
   - `typecheck`: `tsc --noEmit` in every package.
-- `tsconfig.base.json`: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+- `tsconfig.base.json`: `strict`, `noUncheckedIndexedAccess`, `noImplicitReturns`,
   `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`.
 - `docker-compose.yml`: `mongo:8` on 27017, `postgres:17` on 5432, named volumes, healthchecks.
 - `.env.example`: `PORT`, `MONGO_URL`, `MONGO_DB`, `DATABASE_URL`, `WEB_ORIGIN`,

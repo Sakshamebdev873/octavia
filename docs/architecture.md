@@ -50,7 +50,7 @@ flowchart LR
 │        └─ index.ts
 └─ apps/
    ├─ api/                  # @flowlet/api: Hono on Bun, port 4000
-   │  ├─ migrations/        # 0001_init.sql, ... (committed, applied in order)
+   │  ├─ migrations/        # 0001_init, 0002_preserve_json_key_order, 0003_event_id_dedupe
    │  ├─ scripts/migrate.ts # waits for DBs, applies SQL migrations, ensures Mongo indexes
    │  ├─ src/
    │  │  ├─ index.ts        # entry: connect DBs, build app, Bun.serve
@@ -142,7 +142,7 @@ erDiagram
     text flow_id "Mongo _id hex"
     text event_id "nullable, for X-Event-Id dedupe"
     text status "running|success|filtered|failed"
-    jsonb payload
+    json payload "exactly as received"
     text error
     timestamptz started_at
     timestamptz finished_at
@@ -153,8 +153,8 @@ erDiagram
     smallint position PK
     text type "filter|transform|http_request"
     text status "success|failed|skipped"
-    jsonb input
-    jsonb output
+    json input
+    json output
     text error
     int duration_ms
   }
@@ -192,6 +192,7 @@ Every error uses one shape:
 | `INVALID_SIGNATURE` | 401 | Signature header missing, malformed or wrong |
 | `NOT_FOUND` | 404 | Unknown flow, run or route (also an id that is not a valid ObjectId/UUID) |
 | `FLOW_DISABLED` | 409 | A webhook was sent to a disabled flow |
+| `DUPLICATE_EVENT` | 409 | Same `X-Event-Id` while the first delivery is still running |
 | `PAYLOAD_TOO_LARGE` | 413 | Body over 1 MB |
 | `INTERNAL_ERROR` | 500 | Anything unexpected. The message is generic and the details are logged server side |
 

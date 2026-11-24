@@ -58,8 +58,9 @@ If an `X-Event-Id` header (1 to 200 characters) is present, `runs.start` becomes
 
 - Inserted → run the steps as normal.
 - Conflict → load the existing run and return `200 { runId, status }` with
-  `X-Flowlet-Duplicate: true`. If the original is still `running`, return `"status": "running"`
-  as well, and note in the README that this is the one case outside the three final statuses.
+  `X-Flowlet-Duplicate: true`. If the original is still `running`, return `409 DUPLICATE_EVENT`:
+  senders retry non-2xx responses, and by then the original run has finished. The 200 body
+  keeps the three final statuses of the contract.
 
 The signature is still checked first, so a duplicate id from an unsigned caller is a 401.
 

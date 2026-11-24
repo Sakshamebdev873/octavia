@@ -6,19 +6,26 @@ with cursor pagination and compute stats in SQL.
 **Phase:** 5 · **Location:** `apps/api/migrations/`, `apps/api/scripts/migrate.ts`,
 `apps/api/src/modules/runs/`, `apps/api/src/db/postgres.ts`
 
-## Migration `0001_init.sql`
+## Schema (after migrations 0001 to 0003)
+
+| File | Change |
+| --- | --- |
+| `0001_init.sql` | `runs`, `run_steps` (FK with `ON DELETE CASCADE`), CHECK constraints, the two run-list indexes |
+| `0002_preserve_json_key_order.sql` | `payload`, `input`, `output` from `jsonb` to `json` (see below) |
+| `0003_event_id_dedupe.sql` | `runs.event_id` and the partial unique index for `X-Event-Id` |
 
 ```sql
 CREATE TABLE runs (
   id           uuid        PRIMARY KEY,
   flow_id      text        NOT NULL,
-  event_id     text,
+  event_id     text,                                     -- 0003
   status       text        NOT NULL CHECK (status IN ('running','success','filtered','failed')),
-  payload      jsonb       NOT NULL,
+  payload      json        NOT NULL,                     -- 0002: was jsonb
   error        text,
   started_at   timestamptz NOT NULL,
   finished_at  timestamptz,
-  duration_ms  integer     CHECK (duration_ms >= 0)
+  duration_ms  integer     CHECK (duration_ms >= 0),
+  CHECK ((status = 'running') = (finished_at IS NULL))
 );
 
 CREATE TABLE run_steps (
@@ -26,8 +33,8 @@ CREATE TABLE run_steps (
   position     smallint    NOT NULL CHECK (position BETWEEN 1 AND 5),
   type         text        NOT NULL CHECK (type IN ('filter','transform','http_request')),
   status       text        NOT NULL CHECK (status IN ('success','failed','skipped')),
-  input        jsonb,
-  output       jsonb,
+  input        json,                                     -- 0002: was jsonb
+  output       json,                                     -- 0002: was jsonb
   error        text,
   duration_ms  integer     NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
   PRIMARY KEY (run_id, position)
@@ -35,8 +42,17 @@ CREATE TABLE run_steps (
 
 CREATE INDEX runs_flow_started_idx        ON runs (flow_id, started_at DESC, id DESC);
 CREATE INDEX runs_flow_status_started_idx ON runs (flow_id, status, started_at DESC, id DESC);
-CREATE UNIQUE INDEX runs_flow_event_uniq  ON runs (flow_id, event_id) WHERE event_id IS NOT NULL;
+CREATE UNIQUE INDEX runs_flow_event_uniq  ON runs (flow_id, event_id) WHERE event_id IS NOT NULL;  -- 0003
 ```
+
+- Run ids are **UUIDv7** (`Bun.randomUUIDv7()`). They are time ordered, so inserts land at the
+  end of the primary-key B-tree instead of at random places.
+- `CHECK` constraints keep bad statuses out even if the application has a bug.
+- **Why `json` and not `jsonb`:** `jsonb` reorders object keys, so a transform with mapping
+  `{ orderId, total, email }` came back as `{ email, total, orderId }`. We never query inside
+  these columns, so `json` (stored exactly as written, still validated) is the better fit.
+  Values go in as `${JSON.stringify(v)}::text::json` and come out as `column::text` + `JSON.parse`,
+  which works the same on every Bun version.
 
 - Run ids are **UUIDv7** (`Bun.randomUUIDv7()`). They are time ordered, so inserts land at the
   end of the primary-key B-tree instead of at random places.
@@ -57,8 +73,8 @@ CREATE UNIQUE INDEX runs_flow_event_uniq  ON runs (flow_id, event_id) WHERE even
 1. Connect to Postgres, retrying every second for up to 30 seconds. Containers started with
    `docker compose up -d` are not ready immediately, and the brief runs `migrate` right after.
 2. `CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`.
-3. For each `migrations/*.sql`, sorted by name and not yet applied: run the file and insert its
-   name in **one transaction**. A failing migration leaves nothing half applied.
+3. Under an advisory lock, apply every pending `migrations/*.sql` in name order and record it,
+   all in **one transaction**. A failing migration leaves nothing half applied.
 4. Connect to Mongo (with the same retry) and `ensureFlowIndexes()`. `createIndex` is idempotent.
 5. Print what was applied and exit 0. On error, print it and exit 1.
 
@@ -66,8 +82,9 @@ CREATE UNIQUE INDEX runs_flow_event_uniq  ON runs (flow_id, event_id) WHERE even
 
 ```ts
 export interface RunRepository {
-  start(input: { flowId: string; payload: JsonValue; startedAt: Date; eventId?: string }): Promise<string>;
-  finish(runId: string, result: RunResult, finishedAt: Date): Promise<void>;
+  start(input: { flowId: string; payload: JsonValue; startedAt: Date }): Promise<string>;
+  claim(input: { flowId; payload; startedAt; eventId: string }): Promise<ClaimResult>;  // X-Event-Id
+  finish(runId: string, result: RunResult, finishedAt: Date, durationMs: number): Promise<void>;
   listByFlow(flowId: string, q: { status?: RunStatus; limit: number; cursor?: Cursor }): Promise<RunPage>;
   findById(runId: string): Promise<Run | null>;
   stats(flowId: string): Promise<FlowStats>;
@@ -76,7 +93,7 @@ export interface RunRepository {
 }
 ```
 
-`finish` runs in one transaction (`sql.begin`): a multi-row `INSERT INTO run_steps`, then
+`finish` runs in one transaction (`sql.begin`): one `INSERT INTO run_steps` per step (at most 5), then
 `UPDATE runs SET status, error, finished_at, duration_ms`.
 
 ## Cursor pagination
