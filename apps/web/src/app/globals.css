@@ -29,7 +29,8 @@ h1, h2, h3 { line-height: 1.25; margin: 0 0 0.5rem; }
 h1 { font-size: 1.5rem; }
 h2 { font-size: 1.15rem; }
 h3 { font-size: 1rem; }
-p { margin: 0 0 0.75rem; }
+/* User text (descriptions, flow names in breadcrumbs) can be one long word; let it wrap instead of widening the page. */
+p { margin: 0 0 0.75rem; overflow-wrap: anywhere; }
 a { color: var(--accent); }
 code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.85rem; }
 
