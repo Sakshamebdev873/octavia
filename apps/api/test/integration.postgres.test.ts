@@ -52,6 +52,21 @@ describe.skipIf(!reachable)("PostgresRunRepository", () => {
     expect(run?.steps[2]?.input).toBeNull();
   });
 
+  test("keeps object keys in the order they were written (json, not jsonb)", async () => {
+    const id = await repo.start({ flowId: flowA, payload: { zeta: 1, alpha: 2 }, startedAt: new Date(0) });
+    const output = { orderId: "ORD-1042", total: 4999, email: "asha@example.com" };
+    await repo.finish(
+      id,
+      success([{ position: 1, type: "transform", status: "success", input: {}, output, error: null, durationMs: 0 }]),
+      new Date(0),
+      0,
+    );
+    const run = await repo.findById(id);
+    expect(Object.keys(run?.payload ?? {})).toEqual(["zeta", "alpha"]);
+    expect(Object.keys(run?.steps[0]?.output ?? {})).toEqual(["orderId", "total", "email"]);
+    await sql`DELETE FROM runs WHERE id = ${id}::uuid`;
+  });
+
   test("pages newest first with no overlap, and filters by status", async () => {
     const base = Date.now() + 60_000; // newer than the run from the previous test
     for (let i = 0; i < 25; i++) {

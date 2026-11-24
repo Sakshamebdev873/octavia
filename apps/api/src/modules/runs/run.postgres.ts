@@ -1,6 +1,6 @@
 import type { FlowStats, LastRun, Run, RunPage, RunStatus, RunStep, RunSummary, StepStatus, StepType } from "@flowlet/shared";
 import type { SQL } from "bun";
-import { fromJsonb, toJsonb } from "../../db/postgres";
+import { fromJsonText, toJsonText } from "../../db/postgres";
 import type { RunResult } from "../engine/runner";
 import { encodeCursor } from "./cursor";
 import { isUuid, type ListRunsQuery, type RunRepository, type StartRunInput } from "./run.repository";
@@ -20,7 +20,7 @@ interface StepRow {
   position: number;
   type: StepType;
   status: StepStatus;
-  input: string | null; // jsonb selected as ::text
+  input: string | null; // json selected as ::text
   output: string | null;
   error: string | null;
   duration_ms: number;
@@ -44,8 +44,8 @@ function toRunStep(row: StepRow): RunStep {
     position: row.position,
     type: row.type,
     status: row.status,
-    input: fromJsonb(row.input),
-    output: fromJsonb(row.output),
+    input: fromJsonText(row.input),
+    output: fromJsonText(row.output),
     error: row.error,
     durationMs: row.duration_ms,
   };
@@ -58,7 +58,7 @@ export class PostgresRunRepository implements RunRepository {
     const id = Bun.randomUUIDv7();
     await this.sql`
       INSERT INTO runs (id, flow_id, status, payload, started_at)
-      VALUES (${id}::uuid, ${flowId}, 'running', ${toJsonb(payload)}::text::jsonb, ${startedAt})`;
+      VALUES (${id}::uuid, ${flowId}, 'running', ${toJsonText(payload)}::text::json, ${startedAt})`;
     return id;
   }
 
@@ -69,7 +69,7 @@ export class PostgresRunRepository implements RunRepository {
         await tx`
           INSERT INTO run_steps (run_id, position, type, status, input, output, error, duration_ms)
           VALUES (${runId}::uuid, ${step.position}, ${step.type}, ${step.status},
-                  ${toJsonb(step.input)}::text::jsonb, ${toJsonb(step.output)}::text::jsonb,
+                  ${toJsonText(step.input)}::text::json, ${toJsonText(step.output)}::text::json,
                   ${step.error}, ${step.durationMs})`;
       }
       await tx`
@@ -115,7 +115,7 @@ export class PostgresRunRepository implements RunRepository {
       FROM run_steps WHERE run_id = ${runId}::uuid
       ORDER BY position`;
 
-    return { ...toRunSummary(row), payload: fromJsonb(row.payload), steps: steps.map(toRunStep) };
+    return { ...toRunSummary(row), payload: fromJsonText(row.payload), steps: steps.map(toRunStep) };
   }
 
   async stats(flowId: string): Promise<FlowStats> {
