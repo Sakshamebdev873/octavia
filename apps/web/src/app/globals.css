@@ -144,7 +144,8 @@ legend { font-weight: 700; padding: 0; margin-bottom: 0.5rem; }
 .dot-failed { background: var(--failed-fg); }
 .dot-skipped { background: #b3bac4; }
 .timeline-item.is-skipped .card { opacity: 0.75; }
-.io { display: grid; gap: 0.75rem; margin-top: 0.75rem; }
+/* minmax(0, 1fr): an auto column grows to the widest <pre> line and pushes the page sideways on phones. */
+.io { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; margin-top: 0.75rem; }
 @media (min-width: 640px) { .io { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .error-box { background: var(--failed-bg); color: var(--failed-fg); border-radius: var(--radius); padding: 0.5rem 0.75rem; margin-top: 0.75rem; overflow-wrap: anywhere; }
 details > summary { cursor: pointer; font-weight: 600; }
