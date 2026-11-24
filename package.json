@@ -1,0 +1,15 @@
+{
+  "name": "flowlet",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter \"@flowlet/api\" --filter \"@flowlet/web\" dev",
+    "migrate": "bun apps/api/scripts/migrate.ts",
+    "typecheck": "bun run --filter \"*\" typecheck",
+    "test": "bun test"
+  }
+}
