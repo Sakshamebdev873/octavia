@@ -64,7 +64,8 @@ describe("GET /api/flows", () => {
   test("lists flows without steps or secret, with the latest run", async () => {
     const { app, runs } = buildTestApp();
     const flow = await createFlow(app);
-    runs.latest.set(flow.id, { id: "run-1", status: "success", startedAt: new Date().toISOString() });
+    const runId = await runs.start({ flowId: flow.id, payload: {}, startedAt: new Date() });
+    await runs.finish(runId, { status: "success", error: null, steps: [] }, new Date(), 3);
 
     const res = await app.request("/api/flows");
     expect(res.status).toBe(200);
@@ -107,9 +108,10 @@ describe("GET, PATCH and DELETE /api/flows/:id", () => {
   test("deletes a flow and its run history", async () => {
     const { app, runs } = buildTestApp();
     const flow = await createFlow(app);
+    await runs.start({ flowId: flow.id, payload: {}, startedAt: new Date() });
     const res = await app.request(`/api/flows/${flow.id}`, { method: "DELETE" });
     expect(res.status).toBe(204);
-    expect(runs.deletedFlowIds).toEqual([flow.id]);
+    expect(runs.runs.size).toBe(0);
     expect((await app.request(`/api/flows/${flow.id}`)).status).toBe(404);
   });
 

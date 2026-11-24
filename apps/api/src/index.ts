@@ -1,24 +1,21 @@
-import type { LastRun } from "@flowlet/shared";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { connectMongo } from "./db/mongo";
+import { connectPostgres } from "./db/postgres";
 import { ensureFlowIndexes, MongoFlowRepository } from "./modules/flows/flow.mongo";
-import type { FlowRunsPort } from "./modules/flows/flow.repository";
+import { PostgresRunRepository } from "./modules/runs/run.postgres";
 
 const config = loadConfig();
 
-const mongo = await connectMongo(config.MONGO_URL, config.MONGO_DB);
+const [mongo, sql] = await Promise.all([
+  connectMongo(config.MONGO_URL, config.MONGO_DB),
+  connectPostgres(config.DATABASE_URL),
+]);
 await ensureFlowIndexes(mongo.db);
-
-// Temporary until the Postgres run repository exists (Phase 5).
-const runs: FlowRunsPort = {
-  latestByFlowIds: async () => new Map<string, LastRun>(),
-  deleteByFlow: async () => {},
-};
 
 const app = createApp({
   flows: new MongoFlowRepository(mongo.db),
-  runs,
+  runs: new PostgresRunRepository(sql),
   webOrigin: config.WEB_ORIGIN,
   logRequests: true,
 });
@@ -31,7 +28,7 @@ function shutdown(signal: string): void {
   console.log(`${signal} received, shutting down`);
   void server
     .stop()
-    .then(() => mongo.client.close())
+    .then(() => Promise.all([mongo.client.close(), sql.close()]))
     .then(() => process.exit(0));
 }
 

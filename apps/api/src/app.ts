@@ -3,15 +3,17 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { ApiError, errorBody } from "./lib/errors";
-import type { FlowRepository, FlowRunsPort } from "./modules/flows/flow.repository";
+import type { FlowRepository } from "./modules/flows/flow.repository";
 import { flowRoutes } from "./modules/flows/flow.routes";
 import { mockRoutes } from "./modules/mock/mock.routes";
+import type { RunRepository } from "./modules/runs/run.repository";
+import { runRoutes } from "./modules/runs/run.routes";
 
 export const MAX_BODY_BYTES = 1024 * 1024; // 1 MB
 
 export interface AppDeps {
   flows: FlowRepository;
-  runs: FlowRunsPort;
+  runs: RunRepository;
   /** Origin of the web app, allowed by CORS. */
   webOrigin: string;
   /** Log one line per request. Off in tests. */
@@ -45,6 +47,7 @@ export function createApp(deps: AppDeps): Hono {
   );
 
   app.route("/api/flows", flowRoutes(deps));
+  app.route("/api", runRoutes(deps));
   app.route("/api/mock", mockRoutes());
 
   app.notFound((c) => c.json(errorBody("NOT_FOUND", "Route not found"), 404));
