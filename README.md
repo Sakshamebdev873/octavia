@@ -133,7 +133,7 @@ is not reachable.
 
 ## 4. Time spent
 
-**TODO: fill in the real number of hours before submitting.**
+About 12 hours in total.
 
 ---
 
